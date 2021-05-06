@@ -50,7 +50,7 @@ local function create_uid_database(files, directory)
         local file_ext = file:match("%.(%w+)$")
 
         if file_extensions[file_ext] then
-            file = directory..file
+            file = utils.join_path(directory,file)
             local uid, prev, next = get_uids(file)
             if uid ~= nil then
                 files_segments[uid] = {

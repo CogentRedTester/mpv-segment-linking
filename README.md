@@ -36,6 +36,10 @@ There are a small number of limitations compared to the native implementation of
 
 * `ordered-chapters-files` cannot get the UIDs of playlist items that are accessed over a network protocol (http, ftp, etc)
 
-## Unknown Behaviour
+## Unclear Behaviour
 
 It is not clear how this script would react with files that also contain ordered chapters or editions. I do not have any files to test this with.
+
+Currently new chapters are added between each linked file. My test files already have chapters at those locations, which makes for a messy chapter index.
+I haven't yet checked if linked segments always have inbuilt chapters, or if it's just my files, and if it is worth cleaning these chapters up I don't yet know how.
+

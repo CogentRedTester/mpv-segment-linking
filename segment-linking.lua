@@ -1,9 +1,19 @@
+--[[
+    A script to implement support for matroska next/prev segment linking.
+    Available at: https://github.com/CogentRedTester/mpv-segment-linking
+
+    This is a different feature to ordered chapters, which mpv already supports natively.
+    This script requires mkvinfo to be available in the system path.
+]]--
+
 local mp = require "mp"
 local msg = require "mp.msg"
 local utils = require "mp.utils"
 
 local ORDERED_CHAPTERS_ENABLED
 local REFERENCES_ENABLED
+
+--file extensions that support segment linking
 local file_extensions = {
     mkv = true,
     mka = true
@@ -29,6 +39,7 @@ local function get_uids(file)
             output:match("Next segment UID: ([^\n\r]+)")
 end
 
+--creates a table to allow easy uid resolution for chained segments
 local function create_uid_database(files, directory)
     local files_segments = {}
     for _, file in ipairs(files) do
@@ -49,7 +60,9 @@ local function create_uid_database(files, directory)
     return files_segments
 end
 
+--builds a timeline of linked segments for the current file
 local function main()
+    --we will respect these options just as ordered chapters do
     if not (ORDERED_CHAPTERS_ENABLED and REFERENCES_ENABLED) then return end
 
     local path = mp.get_property("stream-open-filename", "")
@@ -64,51 +77,58 @@ local function main()
     if not uid then return end
     if not prev and not next then return end
 
+    ------------------------------------------------------------------
+    ---------- Most files will stop before here ----------------------
+    ------------------------------------------------------------------
+
     msg.info("File uses linked segments, will build edit timeline.")
+    local list = {path}
 
     local directory
-    local list = {path}
     local files
     local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
 
+    --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
     if ordered_chapters_files == "" then
         --grabs the directory portion of the original path
         directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$")
-
-        local full_path = utils.join_path(mp.get_property("working-directory", ""), path)
-        files = utils.readdir(utils.split_path(full_path), "files")
+        files = utils.readdir(directory, "files")
 
         msg.info("Will scan other files in the same directory to find referenced sources.")
+
     else
-        directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$")
+        msg.info("Loading references from '"..ordered_chapters_files.."'")
 
         local pl = io.open(ordered_chapters_files, "r")
+        if not pl then
+            msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory")
+            return
+        end
+
         files = {}
         for line in pl:lines() do
             --remove the newline character at the end of the playlist
             table.insert(files, line:sub(1, -2))
         end
-
-        msg.info("Loading references from '"..ordered_chapters_files.."'")
+        directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$")
     end
 
     local database = create_uid_database(files, directory)
 
     --adds the next and previous segment ids until re3aching the end of the uid chain
     while (prev and database[prev]) do
-        table.insert(list, 1, database[prev].file)
         msg.info("Match for previous segment:", database[prev].file)
-
+        table.insert(list, 1, database[prev].file)
         prev = database[prev].prev
     end
 
     while (next and database[next]) do
-        table.insert(list, database[next].file)
         msg.info("Match for next segment:", database[next].file)
-
+        table.insert(list, database[next].file)
         next = database[next].next
     end
 
+    --we'll use the mpv edl specification to merge the files into one seamless timeline
     local edl_path = "edl://" .. table.concat(list, ";")
     mp.set_property("stream-open-filename", edl_path)
 end

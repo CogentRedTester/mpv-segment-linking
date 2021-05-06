@@ -94,8 +94,11 @@ local function main()
     --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
     if ordered_chapters_files == "" then
         --grabs the directory portion of the original path
-        directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$")
-        files = utils.readdir(directory, "files")
+        directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+        local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
+
+        files = utils.readdir(open_dir, "files")
+        if not files then return msg.error("Could not read directory '"..open_dir.."'") end
 
         msg.info("Will scan other files in the same directory to find referenced sources.")
 
@@ -103,17 +106,14 @@ local function main()
         msg.info("Loading references from '"..ordered_chapters_files.."'")
 
         local pl = io.open(ordered_chapters_files, "r")
-        if not pl then
-            msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory")
-            return
-        end
+        if not pl then return msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory") end
 
         files = {}
         for line in pl:lines() do
-            --remove the newline character at the end of the playlist
+            --remove the newline character at the end of each line
             table.insert(files, line:sub(1, -2))
         end
-        directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$")
+        directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
     end
 
     local database = create_uid_database(files, directory)

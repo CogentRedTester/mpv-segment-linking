@@ -10,8 +10,12 @@ local mp = require "mp"
 local msg = require "mp.msg"
 local utils = require "mp.utils"
 
+local FLAG_CHAPTER_FIX
+local LATEST_LIST
+
 local ORDERED_CHAPTERS_ENABLED
 local REFERENCES_ENABLED
+local MERGE_THRESHOLD
 
 --file extensions that support segment linking
 local file_extensions = {
@@ -129,10 +133,46 @@ local function main()
     end
 
     --we'll use the mpv edl specification to merge the files into one seamless timeline
-    local edl_path = "edl://" .. table.concat(list, ";")
+    local edl_path = "edl://"
+    for _, segment in ipairs(list) do
+        edl_path = edl_path..segment..",title=__segment_linking_title__;"
+    end
     mp.set_property("stream-open-filename", edl_path)
+
+    --flag fixes for the chapters
+    FLAG_CHAPTER_FIX = true
+    LATEST_LIST = list
 end
 
-mp.add_hook("on_load", 20, main)
+--remove chapters added by the edl specification and within the merge threshold
+--segment linking does not have chapter generation as part of the specification and vlc does not do this, so we'll remove them all
+--if the new chapters created by the edl stream are exactly equal to an existing chapter then
+--it can make it impossible to seek backwards past the chapter unless we remove something
+--other larger chapter mismatches are the responsibility of the encoder
+local function fix_chapters()
+    if not FLAG_CHAPTER_FIX or not LATEST_LIST then return end
+
+    local chapters = mp.get_property_native("chapter-list", {})
+
+    for i=#chapters, 1, -1 do
+        if chapters[i].title == "__segment_linking_title__" then
+            table.remove(chapters, i)
+        end
+    end
+
+    for i = #chapters, 2, -1 do
+        if math.abs(chapters[i].time - chapters[i-1].time) < MERGE_THRESHOLD then
+            table.remove(chapters, i)
+        end
+    end
+
+    mp.set_property_native("chapter-list", chapters)
+
+    FLAG_CHAPTER_FIX = false
+end
+
+mp.add_hook("on_load", 10, main)
+mp.add_hook("on_preloaded", 10, fix_chapters)
 mp.observe_property("access-references", "bool", function(_, val) REFERENCES_ENABLED = val end)
 mp.observe_property("ordered-chapters", "bool", function(_, val) ORDERED_CHAPTERS_ENABLED = val end)
+mp.observe_property("chapter-merge-threshold", "number", function(_, val) MERGE_THRESHOLD = val/1000 end)

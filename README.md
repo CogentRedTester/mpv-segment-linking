@@ -24,6 +24,8 @@ This is to maintain parity with normal ordered chapters, considering the similar
 
 The script also respects the `ordered-chapters-files` option, which tells the player to search for matching files inside the given playlist, instead of the file's directory.
 
+The script uses the `chapter-merge-threshold` option to merge chapters that are too close together, as with ordered chapters.
+
 ## Limitations
 
 There are a small number of limitations compared to the native implementation of ordered chapters, mostly involving the use of the `ordered-chapters-files` option.
@@ -40,6 +42,5 @@ There are a small number of limitations compared to the native implementation of
 
 It is not clear how this script would react with files that also contain ordered chapters or editions. I do not have any files to test this with.
 
-Currently new chapters are added between each linked file. My test files already have chapters at those locations, which makes for a messy chapter index.
-I haven't yet checked if linked segments always have inbuilt chapters, or if it's just my files, and if it is worth cleaning these chapters up I don't yet know how.
-
+All chapters added between segments by the edl specification are removed by the script whether or not they are within the merge threshold of existing chapters.
+This behaviour matches the VLC implementation of the feature, which is what I'll be replicating.

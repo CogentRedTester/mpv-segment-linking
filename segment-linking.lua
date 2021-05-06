@@ -170,8 +170,8 @@ local function fix_chapters()
     FLAG_CHAPTER_FIX = false
 end
 
-mp.add_hook("on_load", 10, main)
-mp.add_hook("on_preloaded", 10, fix_chapters)
+mp.add_hook("on_load", 50, main)
+mp.add_hook("on_preloaded", 50, fix_chapters)
 
 --monitor the relevant options
 mp.observe_property("access-references", "bool", function(_, val) REFERENCES_ENABLED = val end)

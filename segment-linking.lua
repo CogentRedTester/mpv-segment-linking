@@ -11,7 +11,6 @@ local msg = require "mp.msg"
 local utils = require "mp.utils"
 
 local FLAG_CHAPTER_FIX
-local LATEST_LIST
 
 local ORDERED_CHAPTERS_ENABLED
 local REFERENCES_ENABLED
@@ -141,7 +140,6 @@ local function main()
 
     --flag fixes for the chapters
     FLAG_CHAPTER_FIX = true
-    LATEST_LIST = list
 end
 
 --remove chapters added by the edl specification and within the merge threshold
@@ -150,16 +148,18 @@ end
 --it can make it impossible to seek backwards past the chapter unless we remove something
 --other larger chapter mismatches are the responsibility of the encoder
 local function fix_chapters()
-    if not FLAG_CHAPTER_FIX or not LATEST_LIST then return end
+    if not FLAG_CHAPTER_FIX then return end
 
     local chapters = mp.get_property_native("chapter-list", {})
 
+    --remove chapters added by this script
     for i=#chapters, 1, -1 do
         if chapters[i].title == "__segment_linking_title__" then
             table.remove(chapters, i)
         end
     end
 
+    --go over the chapters again and remove ones within the merge threshold
     for i = #chapters, 2, -1 do
         if math.abs(chapters[i].time - chapters[i-1].time) < MERGE_THRESHOLD then
             table.remove(chapters, i)
@@ -167,12 +167,13 @@ local function fix_chapters()
     end
 
     mp.set_property_native("chapter-list", chapters)
-
     FLAG_CHAPTER_FIX = false
 end
 
 mp.add_hook("on_load", 10, main)
 mp.add_hook("on_preloaded", 10, fix_chapters)
+
+--monitor the relevant options
 mp.observe_property("access-references", "bool", function(_, val) REFERENCES_ENABLED = val end)
 mp.observe_property("ordered-chapters", "bool", function(_, val) ORDERED_CHAPTERS_ENABLED = val end)
 mp.observe_property("chapter-merge-threshold", "number", function(_, val) MERGE_THRESHOLD = val/1000 end)

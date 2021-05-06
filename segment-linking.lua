@@ -142,11 +142,19 @@ local function main()
     FLAG_CHAPTER_FIX = true
 end
 
---remove chapters added by the edl specification and within the merge threshold
---segment linking does not have chapter generation as part of the specification and vlc does not do this, so we'll remove them all
---if the new chapters created by the edl stream are exactly equal to an existing chapter then
---it can make it impossible to seek backwards past the chapter unless we remove something
---other larger chapter mismatches are the responsibility of the encoder
+--[[
+    Remove chapters added by the edl specification, with adjacent matching titles, or within the merge threshold.
+
+    Segment linking does not have chapter generation as part of the specification and vlc does not do this, so we'll remove them all.
+
+    If chapters are exactly equal to an existing chapter then it can make it impossible to seek backwards past the chapter
+    unless we remove something, hence we'll merge chapters that are close together. Using the ordered-chapters merge option provides
+    an easy way for people to customise this value, and further ties this script to the inbuilt ordered-chapters feature.
+
+    Splitting chapters often results in the same chapter being present in both files, so we'll also merge adjacent chapters
+    with the same chapter name. This is not part of the spec, but should provide a nice QOL change, with no downsides for encodes
+    that avoid this issue.
+]]--
 local function fix_chapters()
     if not FLAG_CHAPTER_FIX then return end
 
@@ -159,11 +167,16 @@ local function fix_chapters()
         end
     end
 
+    --remove chapters with adjacent matching chapter names, which can happen when splitting segments
+    --we want to do this pass separately to the threshold pass in case the end of a previous chapter falls
+    --within the threshold of an actually new (named) chapter.
+    for i = #chapters, 2, -1 do
+        if chapters[i].title == chapters[i-1].title then table.remove(chapters, i) end
+    end
+
     --go over the chapters again and remove ones within the merge threshold
     for i = #chapters, 2, -1 do
-        if math.abs(chapters[i].time - chapters[i-1].time) < MERGE_THRESHOLD then
-            table.remove(chapters, i)
-        end
+        if math.abs(chapters[i].time - chapters[i-1].time) < MERGE_THRESHOLD then table.remove(chapters, i) end
     end
 
     mp.set_property_native("chapter-list", chapters)

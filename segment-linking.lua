@@ -135,7 +135,7 @@ local function main()
     --we'll use the mpv edl specification to merge the files into one seamless timeline
     local edl_path = "edl://"
     for _, segment in ipairs(list) do
-        edl_path = edl_path..segment..",title=__segment_linking_title__;"
+        edl_path = edl_path..segment..",title=__mkv_segment;"
     end
     mp.set_property("stream-open-filename", edl_path)
 
@@ -163,7 +163,7 @@ local function fix_chapters()
 
     --remove chapters added by this script
     for i=#chapters, 1, -1 do
-        if chapters[i].title == "__segment_linking_title__" then
+        if chapters[i].title == "__mkv_segment" then
             table.remove(chapters, i)
         end
     end

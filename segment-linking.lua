@@ -43,8 +43,37 @@ local function get_uids(file)
             output:match("Next segment UID: ([^\n\r]+)")
 end
 
---creates a table to allow easy uid resolution for chained segments
-local function create_uid_database(files, directory)
+--creates a table of available UIDs for the current file
+--scans either the current file's directory, or the ordered-chapters-files playlist
+local function create_uid_table(path)
+    local files
+    local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
+
+    --grabs the directory portion of the original path
+    local directory = ordered_chapters_files ~= "" and ordered_chapters_files or path
+    directory = directory:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+
+    --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
+    if ordered_chapters_files == "" then
+        msg.info("Will scan other files in the same directory to find referenced sources.")
+        local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
+        print(open_dir)
+        files = utils.readdir(open_dir, "files")
+        if not files then return msg.error("Could not read directory '"..open_dir.."'") end
+    else
+        msg.info("Loading references from '"..ordered_chapters_files.."'")
+
+        local pl = io.open(ordered_chapters_files, "r")
+        if not pl then return msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory") end
+
+        files = {}
+        for line in pl:lines() do
+            --remove the newline character at the end of each line
+            table.insert(files, line:sub(1, -2))
+        end
+    end
+
+    --go through the file list and populate the table
     local files_segments = {}
     for _, file in ipairs(files) do
         local file_ext = file:match("%.(%w+)$")
@@ -61,6 +90,7 @@ local function create_uid_database(files, directory)
             end
         end
     end
+
     return files_segments
 end
 
@@ -82,54 +112,26 @@ local function main()
     if not prev and not next then return end
 
     ------------------------------------------------------------------
-    ---------- Most files will stop before here ----------------------
+    --------- Files without hard links will stop before here ---------
     ------------------------------------------------------------------
 
     msg.info("File uses linked segments, will build edit timeline.")
+
+    --creates a table of available UIDs for the current file
+    local segments = create_uid_table(path)
     local list = {path}
 
-    local directory
-    local files
-    local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
-
-    --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
-    if ordered_chapters_files == "" then
-        --grabs the directory portion of the original path
-        directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
-        local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
-
-        files = utils.readdir(open_dir, "files")
-        if not files then return msg.error("Could not read directory '"..open_dir.."'") end
-
-        msg.info("Will scan other files in the same directory to find referenced sources.")
-
-    else
-        msg.info("Loading references from '"..ordered_chapters_files.."'")
-
-        local pl = io.open(ordered_chapters_files, "r")
-        if not pl then return msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory") end
-
-        files = {}
-        for line in pl:lines() do
-            --remove the newline character at the end of each line
-            table.insert(files, line:sub(1, -2))
-        end
-        directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    --adds the next and previous segment ids until reaching the end of the uid chain
+    while (prev and segments[prev]) do
+        msg.info("Match for previous segment:", segments[prev].file)
+        table.insert(list, 1, segments[prev].file)
+        prev = segments[prev].prev
     end
 
-    local database = create_uid_database(files, directory)
-
-    --adds the next and previous segment ids until re3aching the end of the uid chain
-    while (prev and database[prev]) do
-        msg.info("Match for previous segment:", database[prev].file)
-        table.insert(list, 1, database[prev].file)
-        prev = database[prev].prev
-    end
-
-    while (next and database[next]) do
-        msg.info("Match for next segment:", database[next].file)
-        table.insert(list, database[next].file)
-        next = database[next].next
+    while (next and segments[next]) do
+        msg.info("Match for next segment:", segments[next].file)
+        table.insert(list, segments[next].file)
+        next = segments[next].next
     end
 
     --we'll use the mpv edl specification to merge the files into one seamless timeline
@@ -137,9 +139,8 @@ local function main()
     for _, segment in ipairs(list) do
         edl_path = edl_path..segment..",title=__mkv_segment;"
     end
-    mp.set_property("stream-open-filename", edl_path)
 
-    --flag fixes for the chapters
+    mp.set_property("stream-open-filename", edl_path)
     FLAG_CHAPTER_FIX = true
 end
 
@@ -172,12 +173,16 @@ local function fix_chapters()
     --we want to do this pass separately to the threshold pass in case the end of a previous chapter falls
     --within the threshold of an actually new (named) chapter.
     for i = #chapters, 2, -1 do
-        if chapters[i].title == chapters[i-1].title then table.remove(chapters, i) end
+        if chapters[i].title == chapters[i-1].title then
+            table.remove(chapters, i)
+        end
     end
 
     --go over the chapters again and remove ones within the merge threshold
     for i = #chapters, 2, -1 do
-        if math.abs(chapters[i].time - chapters[i-1].time) < MERGE_THRESHOLD then table.remove(chapters, i) end
+        if chapters[i].time - chapters[i-1].time < MERGE_THRESHOLD then
+            table.remove(chapters, i)
+        end
     end
 
     mp.set_property_native("chapter-list", chapters)

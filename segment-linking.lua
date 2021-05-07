@@ -33,6 +33,7 @@ local function get_uids(file)
 
     if cmd.status ~= 0 then
         msg.error("could not read file", file)
+        msg.error(cmd.stdout)
         return
     end
 

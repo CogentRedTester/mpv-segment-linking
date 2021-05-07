@@ -44,10 +44,10 @@ local function get_uids(file)
 end
 
 --creates a table of available UIDs for the current file
---scans either the current file's directory, or the ordered-chapters-files playlist
-local function create_uid_table(path)
+--scans either the current file's directory, or the ordered-chapters-files playlist.
+--set ordered_chapters_files to an empty string to scan the current directory
+local function create_uid_table(path, ordered_chapters_files)
     local files
-    local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
 
     --grabs the directory portion of the original path
     local directory = ordered_chapters_files ~= "" and ordered_chapters_files or path
@@ -55,14 +55,11 @@ local function create_uid_table(path)
 
     --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
     if ordered_chapters_files == "" then
-        msg.info("Will scan other files in the same directory to find referenced sources.")
         local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
-        print(open_dir)
         files = utils.readdir(open_dir, "files")
         if not files then return msg.error("Could not read directory '"..open_dir.."'") end
-    else
-        msg.info("Loading references from '"..ordered_chapters_files.."'")
 
+    else
         local pl = io.open(ordered_chapters_files, "r")
         if not pl then return msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory") end
 
@@ -117,8 +114,16 @@ local function main()
 
     msg.info("File uses linked segments, will build edit timeline.")
 
+    local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
+
+    if ordered_chapters_files == "" then
+        msg.info("Will scan other files in the same directory to find referenced sources.")
+    else
+        msg.info("Loading references from '"..ordered_chapters_files.."'")
+    end
+
     --creates a table of available UIDs for the current file
-    local segments = create_uid_table(path)
+    local segments = create_uid_table(path, ordered_chapters_files)
     local list = {path}
 
     --adds the next and previous segment ids until reaching the end of the uid chain

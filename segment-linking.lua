@@ -60,13 +60,13 @@ local function create_uid_table(path, ordered_chapters_files)
         if not files then return msg.error("Could not read directory '"..open_dir.."'") end
 
     else
-        local pl = io.open(ordered_chapters_files, "r")
-        if not pl then return msg.error("Cannot open file '"..ordered_chapters_files.."': No such file or directory") end
+        local pl, err = io.open(ordered_chapters_files, "r")
+        if not pl then return msg.error(err) end
 
         files = {}
         for line in pl:lines() do
             --remove the newline character at the end of each line
-            table.insert(files, line:sub(1, -2))
+            table.insert(files, line:match("[^\r\n]+"));
         end
     end
 
@@ -124,6 +124,7 @@ local function main()
 
     --creates a table of available UIDs for the current file
     local segments = create_uid_table(path, ordered_chapters_files)
+    if not segments then return msg.error("Aborting segment link.") end
     local list = {path}
 
     --adds the next and previous segment ids until reaching the end of the uid chain

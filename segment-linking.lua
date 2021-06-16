@@ -22,8 +22,9 @@ local file_extensions = {
     mka = true
 }
 
---returns the uid of the given file, along with the previous and next uids if they exist
-local function get_uids(file)
+--returns the uid of the given file, along with the previous and next uids if they exist.
+--if fail_silent is true then do not print any error messages
+local function get_uids(file, fail_silently)
     local cmd = mp.command_native({
         name = "subprocess",
         playback_only = false,
@@ -32,6 +33,7 @@ local function get_uids(file)
     })
 
     if cmd.status ~= 0 then
+        if fail_silently then return end
         msg.error("could not read file", file)
         msg.error(cmd.stdout)
         return
@@ -99,12 +101,12 @@ local function main()
     local path = mp.get_property("stream-open-filename", "")
     local file_ext = path:match("%.(%w+)$")
 
-    --if not a file that can contain segments, or if the file isn't available locally, then return
+    --if not a file that can contain segments then return
     if not file_extensions[file_ext] then return end
-    if not utils.file_info(path) then return end
 
     --read the uid info for the current file
-    local uid, prev, next = get_uids(path)
+    --if the file cannot be read, or if it does not contain next or prev uids, then return
+    local uid, prev, next = get_uids(path, true)
     if not uid then return end
     if not prev and not next then return end
 

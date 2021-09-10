@@ -1,6 +1,6 @@
 # mpv-segment-linking
 
-Implements support for matroska [segment linking](https://www.ietf.org/archive/id/draft-ietf-cellar-matroska-06.html#name-hard-linking) in mpv player.
+Implements support for matroska [hard segment linking](https://www.ietf.org/archive/id/draft-ietf-cellar-matroska-06.html#name-hard-linking) in mpv player.
 This is **not** the same as [ordered chapters](https://www.ietf.org/archive/id/draft-ietf-cellar-matroska-06.html#name-medium-linking), which mpv already supports natively.
 While both features are relatively obscure, ordered chapters are used for more often due to being able to support everything segments do, plus more.
 Nevertheless, segment linked files do still exist, so this script can be used to implement limitted support for the feature until such a time as mpv implements it natively.
@@ -22,13 +22,13 @@ This script respects the `access-references` and `ordered-chapters` options.
 If either of these options are disabled then so will this script.
 This is to maintain parity with normal ordered chapters, considering the similarities of the features.
 
-The script also respects the `ordered-chapters-files` option, which tells the player to search for matching files inside the given playlist, instead of the file's directory.
+The `chapter-merge-threshold` option is used to merge chapters that are too close together, as with ordered chapters.
 
-The script uses the `chapter-merge-threshold` option to merge chapters that are too close together, as with ordered chapters.
+The script also has limitted support for the `ordered-chapters-files` option, which tells the player to search for matching files inside the given playlist, instead of the file's directory. This may be changed to a separate option in the future.
 
 ## Limitations
 
-There are a small number of limitations compared to the native implementation of ordered chapters, mostly involving the use of the `ordered-chapters-files` option.
+There are several limitations compared to the native implementation of ordered chapters, mostly involving the use of the `ordered-chapters-files` option.
 
 * cannot detect if a network file should contain segments
 

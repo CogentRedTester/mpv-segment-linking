@@ -11,7 +11,7 @@ local msg = require "mp.msg"
 local utils = require "mp.utils"
 
 package.path = mp.command_native({"expand-path", "~~/script-modules/?.lua;"}) .. package.path
-local rf = require "read-file"
+local RF_LOADED, rf = pcall(function() return require "read-file" end)
 
 local FLAG_CHAPTER_FIX
 
@@ -28,7 +28,7 @@ local file_extensions = {
 --read contents of the given file
 --tries to use the read-file module to support network files
 local function open_file(file)
-    if not rf then return io.open(file) end
+    if not RF_LOADED then return io.open(file) end
     return rf.get_file_handler(file)
 end
 

@@ -70,6 +70,8 @@ local function create_uid_table(path, ordered_chapters_files)
             --remove the newline character at the end of each line
             table.insert(files, line:match("[^\r\n]+"));
         end
+
+        pl:close()
     end
 
     --go through the file list and populate the table

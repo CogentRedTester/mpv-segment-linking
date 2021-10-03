@@ -10,6 +10,9 @@ local mp = require "mp"
 local msg = require "mp.msg"
 local utils = require "mp.utils"
 
+package.path = mp.command_native({"expand-path", "~~/script-modules/?.lua;"}) .. package.path
+local rf = require "read-file"
+
 local FLAG_CHAPTER_FIX
 
 local ORDERED_CHAPTERS_ENABLED
@@ -21,6 +24,13 @@ local file_extensions = {
     mkv = true,
     mka = true
 }
+
+--read contents of the given file
+--tries to use the read-file module to support network files
+local function open_file(file)
+    if not rf then return io.open(file) end
+    return rf.get_file_handler(file)
+end
 
 --returns the uid of the given file, along with the previous and next uids if they exist.
 --if fail_silent is true then do not print any error messages
@@ -62,7 +72,7 @@ local function create_uid_table(path, ordered_chapters_files)
         if not files then return msg.error("Could not read directory '"..open_dir.."'") end
 
     else
-        local pl, err = io.open(ordered_chapters_files, "r")
+        local pl, err = open_file(ordered_chapters_files)
         if not pl then return msg.error(err) end
 
         files = {}

@@ -15,7 +15,15 @@ package.path = mp.command_native({"expand-path", "~~/script-modules/?.lua;"}) ..
 local RF_LOADED, rf = pcall(function() return require "read-file" end)
 
 local o = {
-    segment_files = ""
+    --loads segment information from the given segment meta file instead of scanning for it
+    segment_files = "",
+
+    --if the current file cannot be read, then fallback to the default segment meta file
+    fallback_to_segment_file = false,
+
+    --the default segment file, the script will search for a file with this name inside
+    --the directory of the current file
+    default_segment_file = ".segment-linking"
 }
 
 opts.read_options(o, "segment_linking", function() end)
@@ -45,6 +53,11 @@ do
     end
 end
 
+--gets the directory section of the given path
+local function get_directory(path)
+    return path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+end
+
 --read contents of the given file
 --tries to use the read-file module to support network files
 local function open_file(file)
@@ -65,10 +78,10 @@ local function get_uids(file, fail_silently)
     })
 
     if cmd.status ~= 0 then
-        if fail_silently then return end
+        if fail_silently then return nil, nil, nil, cmd.status end
         msg.error("could not read file", file)
         msg.error(cmd.stdout)
-        return
+        return nil, nil, nil, cmd.status
     end
 
     local output = cmd.stdout
@@ -101,11 +114,11 @@ local function create_uid_table(files, directory)
 end
 
 --creates a uid table from the custom mpv-segment-linking file
-local function create_table_segment_file(path)
+local function create_table_segment_file(path, fail_silently)
     local file, err = open_file(path)
-    if not file then return msg.error(err) end
+    if not file then return not fail_silently and msg.error(err) end
 
-    local directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local directory = get_directory(path)
     local header = file:read("*l")
     local contents = file:read("*a")
     file:close()
@@ -138,7 +151,7 @@ end
 --creates a table of UIDs based on the contents of the ordered-chapters-file playlist
 --files must still be present on the local disk to scan for UIDs
 local function create_table_ordered_chapters(ordered_chapters_files)
-    local directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local directory = get_directory(ordered_chapters_files)
     local pl, err = open_file(ordered_chapters_files)
     if not pl then return msg.error(err) end
 
@@ -154,7 +167,7 @@ end
 
 --creates a table of available UIDs for the current file
 local function create_table_filesystem(path)
-    local directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local directory = get_directory(path)
     local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
     local files = utils.readdir(open_dir, "files")
     if not files then return msg.error("Could not read directory '"..open_dir.."'") end
@@ -164,6 +177,7 @@ end
 
 --returns the uids for the specified path from the table`
 local function get_uids_from_table(path, uids)
+    if not uids then return nil end
     for uid, t in pairs(uids) do
         if decodeURI(path) == decodeURI(t.file) then
             return uid, t.prev, t.next
@@ -182,12 +196,25 @@ local function main()
     --if not a file that can contain segments then return
     if not file_extensions[file_ext] then return end
 
+    local uid, prev, next
+
+    if o.segment_files ~= "" then
+        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.segment_files))
+        if not uid then msg.error("Could not find matching segment UIDs for current file in '"..o.segment_files.."'") end
+        return
+    end
+
     --read the uid info for the current file
     --if the file cannot be read, or if it does not contain next or prev uids, then return
-    local uid, prev, next = get_uids(path, true)
-    if not uid and o.segment_files ~= "" then
-        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.segment_files))
+    local status, fallback
+    uid, prev, next, status = get_uids(path, true)
+
+    --a status of 2 is an open file error
+    if o.fallback_to_segment_file and status == 2 then
+        fallback = create_table_segment_file(get_directory(path)..o.default_segment_file, true)
+        uid, prev, next = get_uids_from_table(path, fallback)
     end
+
     if not uid then return end
     if not prev and not next then return end
 
@@ -202,7 +229,11 @@ local function main()
     --creates a table of available UIDs for the current file
     local segments
 
-    if (o.segment_files ~= "") then
+    if (fallback) then
+        msg.info("Could not read file, will fallback to default segment-linking file")
+        segments = fallback
+
+    elseif (o.segment_files ~= "") then
         msg.info("Loading segment info from '"..o.segment_files.."'")
         segments = create_table_segment_file(o.segment_files)
 

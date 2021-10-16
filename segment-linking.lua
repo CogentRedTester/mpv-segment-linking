@@ -9,9 +9,16 @@
 local mp = require "mp"
 local msg = require "mp.msg"
 local utils = require "mp.utils"
+local opts = require "mp.options"
 
 package.path = mp.command_native({"expand-path", "~~/script-modules/?.lua;"}) .. package.path
 local RF_LOADED, rf = pcall(function() return require "read-file" end)
+
+local o = {
+    segment_files = ""
+}
+
+opts.read_options(o, "segment_linking", function() end)
 
 local FLAG_CHAPTER_FIX
 
@@ -24,6 +31,19 @@ local file_extensions = {
     mkv = true,
     mka = true
 }
+
+--decodes a URL address
+--this piece of code was taken from: https://stackoverflow.com/questions/20405985/lua-decodeuri-luvit/20406960#20406960
+local decodeURI
+do
+    local char, gsub, tonumber = string.char, string.gsub, tonumber
+    local function _(hex) return char(tonumber(hex, 16)) end
+
+    function decodeURI(s)
+        s = gsub(s, '%%(%x%x)', _)
+        return s
+    end
+end
 
 --read contents of the given file
 --tries to use the read-file module to support network files
@@ -80,7 +100,41 @@ local function create_uid_table(files, directory)
     return files_segments
 end
 
-    else
+--creates a uid table from the custom mpv-segment-linking file
+local function create_table_segment_file(path)
+    local file, err = open_file(path)
+    if not file then return msg.error(err) end
+
+    local directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local header = file:read("*l")
+    local contents = file:read("*a")
+    file:close()
+
+    local version = header:match("^# mpv%-segment%-linking v([.%d]+)")
+    msg.verbose("loading segment file v"..version, ("%q"):format(path))
+
+    local uid_table = {}
+    local file_uids = {}
+
+    for line in contents:gmatch("[^\n\r]+") do
+        if (not line:find("^#") ) then
+            local type, uid = line:match("^(%a+)=([%a%d ]+)$")
+            if type == "UID" then
+                uid_table[uid] = file_uids
+            elseif type == "PREV" then
+                file_uids.prev = uid;
+            elseif type == "NEXT" then
+                file_uids.next = uid
+            else
+                file_uids = {}
+                file_uids.file = utils.join_path(directory, line)
+            end
+        end
+    end
+
+    return uid_table
+end
+
 --creates a table of UIDs based on the contents of the ordered-chapters-file playlist
 --files must still be present on the local disk to scan for UIDs
 local function create_table_ordered_chapters(ordered_chapters_files)
@@ -107,10 +161,14 @@ local function create_table_filesystem(path)
 
     return create_uid_table(files, directory)
 end
+
+--returns the uids for the specified path from the table`
+local function get_uids_from_table(path, uids)
+    for uid, t in pairs(uids) do
+        if decodeURI(path) == decodeURI(t.file) then
+            return uid, t.prev, t.next
         end
     end
-
-    return files_segments
 end
 
 --builds a timeline of linked segments for the current file
@@ -127,6 +185,9 @@ local function main()
     --read the uid info for the current file
     --if the file cannot be read, or if it does not contain next or prev uids, then return
     local uid, prev, next = get_uids(path, true)
+    if not uid and o.segment_files ~= "" then
+        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.segment_files))
+    end
     if not uid then return end
     if not prev and not next then return end
 
@@ -140,7 +201,12 @@ local function main()
 
     --creates a table of available UIDs for the current file
     local segments
-    if ordered_chapters_files ~= "" then
+
+    if (o.segment_files ~= "") then
+        msg.info("Loading segment info from '"..o.segment_files.."'")
+        segments = create_table_segment_file(o.segment_files)
+
+    elseif ordered_chapters_files ~= "" then
         msg.info("Loading references from '"..ordered_chapters_files.."'")
         segments = create_table_ordered_chapters(ordered_chapters_files)
 

@@ -210,7 +210,7 @@ local function main()
     uid, prev, next, status = get_uids(path, true)
 
     --a status of 2 is an open file error
-    if o.fallback_to_segment_file and status == 2 then
+    if o.fallback_to_segment_file and (status == nil or status == 2) then
         fallback = create_table_segment_file(get_directory(path)..o.default_segment_file, true)
         uid, prev, next = get_uids_from_table(path, fallback)
     end

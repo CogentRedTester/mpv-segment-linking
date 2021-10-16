@@ -15,15 +15,15 @@ package.path = mp.command_native({"expand-path", "~~/script-modules/?.lua;"}) ..
 local RF_LOADED, rf = pcall(function() return require "read-file" end)
 
 local o = {
-    --loads segment information from the given segment meta file instead of scanning for it
-    segment_files = "",
+    --loads segment information from the given segment metafile instead of scanning for it
+    metafile = "",
 
-    --if the current file cannot be read, then fallback to the default segment meta file
-    fallback_to_segment_file = true,
+    --if the current file cannot be read, then fallback to the default metafile
+    fallback_to_metafile = true,
 
-    --the default segment file, the script will search for a file with this name inside
+    --the default segment metafile file, the script will search for a file with this name inside
     --the directory of the current file
-    default_segment_file = ".segment-linking"
+    default_metafile = ".segment-linking"
 }
 
 opts.read_options(o, "segment_linking", function() end)
@@ -198,9 +198,9 @@ local function main()
 
     local uid, prev, next
 
-    if o.segment_files ~= "" then
-        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.segment_files))
-        if not uid then msg.error("Could not find matching segment UIDs for current file in '"..o.segment_files.."'") end
+    if o.metafile ~= "" then
+        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.metafile))
+        if not uid then msg.error("Could not find matching segment UIDs for current file in '"..o.metafile.."'") end
         return
     end
 
@@ -210,8 +210,8 @@ local function main()
     uid, prev, next, status = get_uids(path, true)
 
     --a status of 2 is an open file error
-    if o.fallback_to_segment_file and (status == nil or status == 2) then
-        fallback = create_table_segment_file(get_directory(path)..o.default_segment_file, true)
+    if o.fallback_to_metafile and (status == nil or status == 2) then
+        fallback = create_table_segment_file(get_directory(path)..o.default_metafile, true)
         uid, prev, next = get_uids_from_table(path, fallback)
     end
 
@@ -233,9 +233,9 @@ local function main()
         msg.info("Could not read file, will fallback to default segment-linking file")
         segments = fallback
 
-    elseif (o.segment_files ~= "") then
-        msg.info("Loading segment info from '"..o.segment_files.."'")
-        segments = create_table_segment_file(o.segment_files)
+    elseif (o.metafile ~= "") then
+        msg.info("Loading segment info from '"..o.metafile.."'")
+        segments = create_table_segment_file(o.metafile)
 
     elseif ordered_chapters_files ~= "" then
         msg.info("Loading references from '"..ordered_chapters_files.."'")

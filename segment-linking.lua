@@ -78,6 +78,7 @@ local function get_uids(file, fail_silently)
     })
 
     if cmd.status ~= 0 then
+        if not cmd.status then cmd.status = -1 end
         if fail_silently then return nil, nil, nil, cmd.status end
         msg.error("could not read file", file)
         msg.error(cmd.stdout)
@@ -210,7 +211,7 @@ local function main()
     uid, prev, next, status = get_uids(path, true)
 
     --a status of 2 is an open file error
-    if o.fallback_to_metafile and (status == nil or status == 2) then
+    if o.fallback_to_metafile and (status == -1 or status == 2) then
         fallback = create_table_segment_file(get_directory(path)..o.default_metafile, true)
         uid, prev, next = get_uids_from_table(path, fallback)
     end

@@ -35,6 +35,8 @@ end
 --returns the uid of the given file, along with the previous and next uids if they exist.
 --if fail_silent is true then do not print any error messages
 local function get_uids(file, fail_silently)
+    msg.debug("scanning UIDs for file", file)
+
     local cmd = mp.command_native({
         name = "subprocess",
         playback_only = false,
@@ -55,35 +57,8 @@ local function get_uids(file, fail_silently)
             output:match("Next segment UID: ([^\n\r]+)")
 end
 
---creates a table of available UIDs for the current file
---scans either the current file's directory, or the ordered-chapters-files playlist.
---set ordered_chapters_files to an empty string to scan the current directory
-local function create_uid_table(path, ordered_chapters_files)
-    local files
-
-    --grabs the directory portion of the original path
-    local directory = ordered_chapters_files ~= "" and ordered_chapters_files or path
-    directory = directory:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
-
-    --grabs either the contents of the current directory, or the contents of the `ordered-chapters-files` option
-    if ordered_chapters_files == "" then
-        local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
-        files = utils.readdir(open_dir, "files")
-        if not files then return msg.error("Could not read directory '"..open_dir.."'") end
-
-    else
-        local pl, err = open_file(ordered_chapters_files)
-        if not pl then return msg.error(err) end
-
-        files = {}
-        for line in pl:lines() do
-            --remove the newline character at the end of each line
-            table.insert(files, line:match("[^\r\n]+"));
-        end
-
-        pl:close()
-    end
-
+--creates a UID table based on the input files
+local function create_uid_table(files, directory)
     --go through the file list and populate the table
     local files_segments = {}
     for _, file in ipairs(files) do
@@ -99,6 +74,39 @@ local function create_uid_table(path, ordered_chapters_files)
                     file = file
                 }
             end
+        end
+    end
+
+    return files_segments
+end
+
+    else
+--creates a table of UIDs based on the contents of the ordered-chapters-file playlist
+--files must still be present on the local disk to scan for UIDs
+local function create_table_ordered_chapters(ordered_chapters_files)
+    local directory = ordered_chapters_files:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local pl, err = open_file(ordered_chapters_files)
+    if not pl then return msg.error(err) end
+
+    local files = {}
+    for line in pl:lines() do
+        --remove the newline character at the end of each line
+        table.insert(files, line:match("[^\r\n]+"));
+    end
+
+    pl:close()
+    return create_uid_table(files, directory)
+end
+
+--creates a table of available UIDs for the current file
+local function create_table_filesystem(path)
+    local directory = path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
+    local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
+    local files = utils.readdir(open_dir, "files")
+    if not files then return msg.error("Could not read directory '"..open_dir.."'") end
+
+    return create_uid_table(files, directory)
+end
         end
     end
 
@@ -130,14 +138,17 @@ local function main()
 
     local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
 
-    if ordered_chapters_files == "" then
-        msg.info("Will scan other files in the same directory to find referenced sources.")
-    else
+    --creates a table of available UIDs for the current file
+    local segments
+    if ordered_chapters_files ~= "" then
         msg.info("Loading references from '"..ordered_chapters_files.."'")
+        segments = create_table_ordered_chapters(ordered_chapters_files)
+
+    else
+        msg.info("Will scan other files in the same directory to find referenced sources.")
+        segments = create_table_filesystem(path)
     end
 
-    --creates a table of available UIDs for the current file
-    local segments = create_uid_table(path, ordered_chapters_files)
     if not segments then return msg.error("Aborting segment link.") end
     local list = {path}
 

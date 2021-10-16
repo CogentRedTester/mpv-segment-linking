@@ -19,7 +19,7 @@ local o = {
     segment_files = "",
 
     --if the current file cannot be read, then fallback to the default segment meta file
-    fallback_to_segment_file = false,
+    fallback_to_segment_file = true,
 
     --the default segment file, the script will search for a file with this name inside
     --the directory of the current file

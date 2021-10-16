@@ -231,7 +231,7 @@ local function main()
     local segments
 
     if (fallback) then
-        msg.info("Could not read file, will fallback to default segment-linking file")
+        msg.info("Could not read file, will fallback to default segment-linking metafile")
         segments = fallback
 
     elseif (o.metafile ~= "") then

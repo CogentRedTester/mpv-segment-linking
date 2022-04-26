@@ -2,10 +2,20 @@
 
 Implements support for matroska [hard segment linking](https://www.ietf.org/archive/id/draft-ietf-cellar-matroska-06.html#name-hard-linking) in mpv player.
 This is **not** the same as [ordered chapters](https://www.ietf.org/archive/id/draft-ietf-cellar-matroska-06.html#name-medium-linking), which mpv already supports natively.
-While both features are relatively obscure, ordered chapters are used for more often due to being able to support everything segments do, plus more.
+While both features are relatively obscure, ordered chapters are used far more often due to being able to support everything segments do, plus more.
 Nevertheless, segment linked files do still exist, so this script can be used to implement limitted support for the feature until such a time as mpv implements it natively.
 
 This script requires that `mkvinfo`, part of the [mkvtoolnix](https://mkvtoolnix.download/) toolset, be available in the system path.
+
+## Basic Setup
+
+If you just want to play local hard-linked files like you would ordered chapters, then all you need to do is:
+
+1.  Place segment-linking.lua into the mpv [scripts directory](https://mpv.io/manual/master/#files)
+2.  Place `mkvinfo` into the system PATH (if in doubt on windows then place in the same directory as `mpv.exe`)
+
+Everything else should be automated.
+All the advanced information below can be ignored.
 
 ## Behaviour
 

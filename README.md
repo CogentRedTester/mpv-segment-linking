@@ -11,8 +11,8 @@ This script requires that `mkvinfo`, part of the [mkvtoolnix](https://mkvtoolnix
 
 If you just want to play local hard-linked files like you would ordered chapters, then all you need to do is:
 
-1.  Place segment-linking.lua into the mpv [scripts directory](https://mpv.io/manual/master/#files)
-2.  Place `mkvinfo` into the system PATH (if in doubt on windows then place in the same directory as `mpv.exe`)
+1. Place segment-linking.lua into the mpv [scripts directory](https://mpv.io/manual/master/#files)
+2. Place `mkvinfo` into the system PATH (if in doubt on windows then place in the same directory as `mpv.exe`)
 
 Everything else should be automated.
 All the advanced information below can be ignored.
@@ -29,6 +29,7 @@ This should follow the official [specification](https://www.ietf.org/archive/id/
 ## Options
 
 ### mpv-options
+
 This script respects the `access-references` and `ordered-chapters` options.
 If either of these options are disabled then so will this script.
 This is to maintain parity with normal ordered chapters, considering the similarities of the features.
@@ -36,10 +37,12 @@ This is to maintain parity with normal ordered chapters, considering the similar
 The `chapter-merge-threshold` option is used to merge chapters that are too close together, as with ordered chapters.
 
 ### script-opts
+
 All script options, and their defaults, are listen in the [segment_linking.conf](segment_linking.conf) file. Most of these options are related to
 the custom segment-linking [metafiles](#metafiles)
 
 ## Metafiles
+
 This script supports custom segment metafiles, which can allow this script to work across network file systems and on systems without `mkvinfo`.
 By default, if the current file cannot be read due to being a network file or because `mkvinfo` is not available, then the script will attempt to read
 a meta-file from the same directory as the currently playing file. The name of the file is specified by the `default_metafile` script-opt.
@@ -92,16 +95,21 @@ UID=0x72 0x77 0xc3 0x31 0xcf 0x62 0xe9 0x55 0xa6 0xd1 0x5d 0x79 0x8c 0x44 0x94 0
 ```
 
 ### Build Scripts
+
 The `Build-SegmentMetaFile.ps1` and `build-segment-metafile.sh` build scripts can be used to generate metafiles in the correct format.
 Simply pass a list of files as arguments to the scripts and they will automatically scan them using `mkvinfo` and save a properly formatted
 metafile into the current folder.
 
-    ./build-segment-metafile.sh *.mkv
+```bash
+./build-segment-metafile.sh *.mkv
+```
 
 The default output file is `.segment-linking`, which matches the default metafile that this script attempts to load.
 However, the output file can be changed using the `-o` flag. For example:
 
-    ./build-segment-metafile.sh *.mkv -o segments.meta
+```bash
+./build-segment-metafile.sh *.mkv -o segments.meta
+```
 
 ## Limitations
 

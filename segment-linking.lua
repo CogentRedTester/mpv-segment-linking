@@ -54,6 +54,11 @@ do
     end
 end
 
+--returns the protocol scheme of the given url, or nil if there is none
+function get_protocol(filename)
+    return string.lower(filename):match("^(%a[%w+-.]*)://")
+end
+
 --gets the directory section of the given path
 local function get_directory(path)
     return path:match("^(.+[/\\])[^/\\]+[/\\]?$") or ""
@@ -64,6 +69,11 @@ end
 local function open_file(file)
     if not RF_LOADED then return io.open(file) end
     return rf.get_file_handler(file)
+end
+
+--wrapper for utils.join_path to handle protocols
+local function join_path(working, relative)
+    return get_protocol(relative) and relative or utils.join_path(working, relative)
 end
 
 --returns the uid of the given file, along with the previous and next uids if they exist.
@@ -119,7 +129,7 @@ local function get_segments_metafile(path, fail_silently)
                 file_uids.next = uid
             else
                 file_uids = {}
-                file_uids.file = utils.join_path(directory, line)
+                file_uids.file = join_path(directory, line):gsub("[/\\].[/\\]", "/")
             end
         end
     end
@@ -140,7 +150,7 @@ local function get_segments_filesystem(path)
         local file_ext = file:match("%.(%w+)$")
 
         if file_extensions[file_ext] then
-            file = utils.join_path(directory,file)
+            file = utils.join_path(directory,file):gsub("[/\\].[/\\]", "/")
             local uid, prev, next = get_uids(file)
             if uid ~= nil then
                 files_segments[uid] = {
@@ -157,6 +167,7 @@ end
 
 --returns the uids for the specified path from the table`
 local function get_uids_from_table(path, uids)
+    path = path:gsub("[/\\].[/\\]", "/")
     if not uids then return nil end
     for uid, t in pairs(uids) do
         if decodeURI(path) == decodeURI(t.file) then

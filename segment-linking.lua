@@ -28,6 +28,7 @@ local o = {
 
 opts.read_options(o, "segment_linking", function() end)
 
+local SEGMENT_CHAPTER = "__mkv_segment"
 local FLAG_CHAPTER_FIX
 
 local ORDERED_CHAPTERS_ENABLED
@@ -226,10 +227,8 @@ local function main()
     end
 
     --we'll use the mpv edl specification to merge the files into one seamless timeline
-    local edl_path = "edl://"
-    for _, segment in ipairs(list) do
-        edl_path = edl_path..segment..",title=__mkv_segment;"
-    end
+    local separator = ",title="..SEGMENT_CHAPTER..";"
+    local edl_path = "edl://"..table.concat(list, separator)..separator
 
     mp.set_property("stream-open-filename", edl_path)
     FLAG_CHAPTER_FIX = true
@@ -255,7 +254,7 @@ local function fix_chapters()
 
     --remove chapters added by this script
     for i=#chapters, 1, -1 do
-        if chapters[i].title == "__mkv_segment" then
+        if chapters[i].title == SEGMENT_CHAPTER then
             table.remove(chapters, i)
         end
     end

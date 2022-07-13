@@ -48,6 +48,49 @@ A metafile can be forcibly used by manually setting the `metafile` script-opt; i
 In order to load network metadata files this script requires that the [mpv-read-file](https://github.com/CogentRedTester/mpv-read-file) API be installed.
 Simply follow the install instructions and make sure to include the `wget` commandline utility in the system path.
 
+### Format
+
+The first line of the metafiles must be `# mpv-segment-linking v0.1`.
+Lines beginning with `#` are treated as comments, empty lines are ignored, and newlines
+can be LF or CRLF. All other lines are treated as statements.
+
+Statements can consist of:
+
+```conf
+<filename>
+UID=<uid>
+PREV=<uid>
+NEXT=<uid>
+```
+
+Where `<filename>` is the absolute or relative path of the file
+for which the following `<uids>` apply. Paths must be relative to the metafile.
+The `UID` field is the segment UID for that matroska file, and the `PREV` and
+`NEXT` fields are the next and previous segment UIDs for that file.
+All three of these fields are optional and can be in any order, but the
+entry is useless without the `UID` field. There cannot be any whitespace before
+or after the `<filename>`, `<uid>`, or `UID|PREV|NEXT`.
+
+The first statement in the file must be a `<filename>`. If multiple
+`UID|PREV|NEXT` statements are made for the same file then the latest
+takes preference.
+
+If you have a file that begins with `UID|PREV|NEXT=` then you can add `./`
+to the front to make it a `<filename>`.
+
+Here is an example of a simple metafile:
+
+```conf
+# mpv-segment-linking v0.1
+
+01. Cardcaptor Sakura [BD 1080p Hi10P 5.1 AAC][kuchikirukia].mkv
+UID=0xbf 0x8c 0x8d 0x54 0x32 0x4e 0x88 0x21 0x96 0x2e 0x55 0x51 0x53 0x7c 0x34 0xc3
+PREV=0x72 0x77 0xc3 0x31 0xcf 0x62 0xe9 0x55 0xa6 0xd1 0x5d 0x79 0x8c 0x44 0x94 0x60
+
+NCOP1a (for linked mkvs).mkv
+UID=0x72 0x77 0xc3 0x31 0xcf 0x62 0xe9 0x55 0xa6 0xd1 0x5d 0x79 0x8c 0x44 0x94 0x60
+```
+
 ### Build Scripts
 The `Build-SegmentMetaFile.ps1` and `build-segment-metafile.sh` build scripts can be used to generate metafiles in the correct format.
 Simply pass a list of files as arguments to the scripts and they will automatically scan them using `mkvinfo` and save a properly formatted

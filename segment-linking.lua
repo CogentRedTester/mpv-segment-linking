@@ -120,13 +120,21 @@ local function get_segments_metafile(path, fail_silently)
 
     for line in contents:gmatch("[^\n\r]+") do
         if (not line:find("^#") ) then
-            local type, uid = line:match("^(%a+)=([%a%d ]+)$")
-            if type == "UID" then
+            local type, uid = line:match("^(%a+)=([%dxabcdef ]+)$")
+
+            --if the uid contained invalid characters then skip line and print warning
+            if type and not uid then
+                msg.warn("invalid UID string in '"..line.."'")
+
+            --if the line is a `UID|PREV|NEXT=<uid>` statement
+            elseif type == "UID" then
                 uid_table[uid] = file_uids
             elseif type == "PREV" then
                 file_uids.prev = uid;
             elseif type == "NEXT" then
                 file_uids.next = uid
+
+            --if the line is a `<filename>` statement
             else
                 file_uids = {}
                 file_uids.file = join_path(directory, line):gsub("[/\\].[/\\]", "/")

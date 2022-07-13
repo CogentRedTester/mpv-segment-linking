@@ -196,10 +196,10 @@ local function main()
     if not file_extensions[file_ext] then return end
 
     local uid, prev, next
-    local status, fallback, segments
+    local err, fallback, segments
 
     if o.metafile == "" then
-        uid, prev, next, status = get_uids(path, true)
+        uid, prev, next, err = get_uids(path, true)
     else
         segments = get_segments_metafile(o.metafile)
         uid, prev, next = get_uids_from_table(path, segments)
@@ -207,7 +207,7 @@ local function main()
     end
 
     --a status of 2 is an open file error
-    if o.fallback_to_metafile and (status == -1 or status == 2) then
+    if o.fallback_to_metafile and err then
         fallback = get_directory(path)..o.default_metafile
         segments = get_segments_metafile(fallback, true)
         uid, prev, next = get_uids_from_table(path, segments)

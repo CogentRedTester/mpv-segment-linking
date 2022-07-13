@@ -35,8 +35,6 @@ This is to maintain parity with normal ordered chapters, considering the similar
 
 The `chapter-merge-threshold` option is used to merge chapters that are too close together, as with ordered chapters.
 
-The script also has limitted support for the `ordered-chapters-files` option, which tells the player to search for matching files inside the given playlist, instead of the file's directory. This may be changed to a separate option in the future.
-
 ### script-opts
 All script options, and their defaults, are listen in the [segment_linking.conf](segment_linking.conf) file. Most of these options are related to
 the custom segment-linking [metafiles](#metafiles)
@@ -64,16 +62,12 @@ However, the output file can be changed using the `-o` flag. For example:
 
 ## Limitations
 
-There are several limitations compared to the native implementation of ordered chapters, mostly involving the use of the `ordered-chapters-files` option.
+There are several limitations compared to the native implementation of ordered chapters.
 Most of these limitations can be solved by using the metafiles.
 
 * cannot detect if a network file should contain segments
 
-* `ordered-chapters-files` only supports playlists consisting of a single filename on each line, more complex playlist formats like `pls` do not work
-
-* `ordered-chapters-files` cannot point to a network playlist (http, ftp, etc)
-
-* `ordered-chapters-files` cannot get the UIDs of playlist items that are accessed over a network protocol (http, ftp, etc)
+* does not support the `ordered-chapters-files` option.
 
 ## Unclear Behaviour
 

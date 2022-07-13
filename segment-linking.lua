@@ -91,31 +91,8 @@ local function get_uids(file, fail_silently)
             output:match("Next segment UID: ([^\n\r]+)")
 end
 
---creates a UID table based on the input files
-local function create_uid_table(files, directory)
-    --go through the file list and populate the table
-    local files_segments = {}
-    for _, file in ipairs(files) do
-        local file_ext = file:match("%.(%w+)$")
-
-        if file_extensions[file_ext] then
-            file = utils.join_path(directory,file)
-            local uid, prev, next = get_uids(file)
-            if uid ~= nil then
-                files_segments[uid] = {
-                    prev = prev,
-                    next = next,
-                    file = file
-                }
-            end
-        end
-    end
-
-    return files_segments
-end
-
 --creates a uid table from the custom mpv-segment-linking file
-local function create_table_segment_file(path, fail_silently)
+local function get_segments_metafile(path, fail_silently)
     local file, err = open_file(path)
     if not file then return not fail_silently and msg.error(err) end
 
@@ -125,7 +102,7 @@ local function create_table_segment_file(path, fail_silently)
     file:close()
 
     local version = header:match("^# mpv%-segment%-linking v([.%d]+)")
-    msg.verbose("loading segment file v"..version, ("%q"):format(path))
+    msg.verbose(("loading segment file v%s %q"):format(version, path))
 
     local uid_table = {}
     local file_uids = {}
@@ -149,31 +126,32 @@ local function create_table_segment_file(path, fail_silently)
     return uid_table
 end
 
---creates a table of UIDs based on the contents of the ordered-chapters-file playlist
---files must still be present on the local disk to scan for UIDs
-local function create_table_ordered_chapters(ordered_chapters_files)
-    local directory = get_directory(ordered_chapters_files)
-    local pl, err = open_file(ordered_chapters_files)
-    if not pl then return msg.error(err) end
-
-    local files = {}
-    for line in pl:lines() do
-        --remove the newline character at the end of each line
-        table.insert(files, line:match("[^\r\n]+"));
-    end
-
-    pl:close()
-    return create_uid_table(files, directory)
-end
-
 --creates a table of available UIDs for the current file
-local function create_table_filesystem(path)
+local function get_segments_filesystem(path)
     local directory = get_directory(path)
     local open_dir = directory ~= "" and directory or mp.get_property("working-directory", "")
     local files = utils.readdir(open_dir, "files")
     if not files then return msg.error("Could not read directory '"..open_dir.."'") end
 
-    return create_uid_table(files, directory)
+    --go through the file list and populate the table
+    local files_segments = {}
+    for _, file in ipairs(files) do
+        local file_ext = file:match("%.(%w+)$")
+
+        if file_extensions[file_ext] then
+            file = utils.join_path(directory,file)
+            local uid, prev, next = get_uids(file)
+            if uid ~= nil then
+                files_segments[uid] = {
+                    prev = prev,
+                    next = next,
+                    file = file
+                }
+            end
+        end
+    end
+
+    return files_segments
 end
 
 --returns the uids for the specified path from the table`
@@ -198,21 +176,21 @@ local function main()
     if not file_extensions[file_ext] then return end
 
     local uid, prev, next
-    local status, fallback
+    local status, fallback, segments
 
-    if o.metafile ~= "" then
-        uid, prev, next = get_uids_from_table(path, create_table_segment_file(o.metafile))
-        if not uid then msg.error("Could not find matching segment UIDs for current file in '"..o.metafile.."'") ; return end
-    else
-        --read the uid info for the current file
-        --if the file cannot be read, or if it does not contain next or prev uids, then return
+    if o.metafile == "" then
         uid, prev, next, status = get_uids(path, true)
+    else
+        segments = get_segments_metafile(o.metafile)
+        uid, prev, next = get_uids_from_table(path, segments)
+        if not uid then msg.error("Could not find matching UID for current file in '"..o.metafile.."'") ; return end
     end
 
     --a status of 2 is an open file error
     if o.fallback_to_metafile and (status == -1 or status == 2) then
-        fallback = create_table_segment_file(get_directory(path)..o.default_metafile, true)
-        uid, prev, next = get_uids_from_table(path, fallback)
+        fallback = get_directory(path)..o.default_metafile
+        segments = get_segments_metafile(fallback, true)
+        uid, prev, next = get_uids_from_table(path, segments)
     end
 
     if not uid then return end
@@ -224,26 +202,11 @@ local function main()
 
     msg.info("File uses linked segments, will build edit timeline.")
 
-    local ordered_chapters_files = mp.get_property("ordered-chapters-files", "")
-
-    --creates a table of available UIDs for the current file
-    local segments
-
-    if (fallback) then
-        msg.info("Could not read file, will fallback to default segment-linking metafile")
-        segments = fallback
-
-    elseif (o.metafile ~= "") then
-        msg.info("Loading segment info from '"..o.metafile.."'")
-        segments = create_table_segment_file(o.metafile)
-
-    elseif ordered_chapters_files ~= "" then
-        msg.info("Loading references from '"..ordered_chapters_files.."'")
-        segments = create_table_ordered_chapters(ordered_chapters_files)
-
+    if      (fallback)           then msg.info("Could not access directory, loading segment info from '"..fallback.."'.")
+    elseif  (o.metafile ~= "")   then msg.info("Loading segment info from '"..o.metafile.."'.")
     else
         msg.info("Will scan other files in the same directory to find referenced sources.")
-        segments = create_table_filesystem(path)
+        segments = get_segments_filesystem(path)
     end
 
     if not segments then return msg.error("Aborting segment link.") end

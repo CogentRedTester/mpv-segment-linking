@@ -35,6 +35,9 @@ local ORDERED_CHAPTERS_ENABLED
 local REFERENCES_ENABLED
 local MERGE_THRESHOLD
 
+--saves the working directory with forward slashes and a trailing slash
+local WORKING_DIRECTORY = mp.get_property("working-directory", ""):gsub("\\", "/"):gsub("/?$", "/")
+
 --file extensions that support segment linking
 local file_extensions = {
     mkv = true,
@@ -119,6 +122,7 @@ local function get_segments_metafile(path, fail_silently)
     local file_uids = {}
 
     for line in contents:gmatch("[^\n\r]+") do
+        msg.trace(line)
         if (not line:find("^#") ) then
             local type, uid = line:match("^(%a+)=([%dxabcdef ]+)$")
 
@@ -173,12 +177,19 @@ local function get_segments_filesystem(path)
     return files_segments
 end
 
---returns the uids for the specified path from the table`
+--returns the uids for the specified path from the table
 local function get_uids_from_table(path, uids)
-    path = path:gsub("[/\\].[/\\]", "/")
+    path = path:gsub("^./", "")
+    path = path:gsub("\\", "/"):gsub("/./", "/")
+    path = decodeURI(path)
+    local in_working = get_directory(path) == WORKING_DIRECTORY
+
     if not uids then return nil end
     for uid, t in pairs(uids) do
-        if decodeURI(path) == decodeURI(t.file) then
+        local file = decodeURI( t.file:gsub("\\", "/") )
+        if  file == path or
+            in_working and (WORKING_DIRECTORY..file) == path
+        then
             return uid, t.prev, t.next
         end
     end
